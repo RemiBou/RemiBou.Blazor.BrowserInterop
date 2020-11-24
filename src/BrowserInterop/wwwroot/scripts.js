@@ -1,5 +1,29 @@
 
 browserInterop = new (function () {
+
+    // Returns a function, that, as long as it continues to be invoked, will not
+    // be triggered. The function will be called after it stops being called for
+    // N milliseconds. If `immediate` is passed, trigger the function on the
+    // leading edge, instead of the trailing.
+    this.debounce = function (func, wait, immediate, triggerPermanent) {
+        var timeout;
+        return function () {
+            var context = this, args = arguments;
+            var later = function () {
+                timeout = null;
+                if (!immediate) func.apply(context, args);
+            };
+            var callNow = immediate && !timeout;
+
+            if (!triggerPermanent || !timeout) {
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            }
+            if (callNow) func.apply(context, args);
+        };
+    };
+
+
     var jsObjectRefs = {};
     var jsObjectRefId = 0;
     var me = this;
@@ -36,21 +60,50 @@ browserInterop = new (function () {
 
             var netObjectRef = value.callbackRef;
 
-            return function () {
-                var args = [];
-                if (!value.getJsObjectRef) {
-                    for (let index = 0; index < arguments.length; index++) {
-                        const element = arguments[index];
-                        args.push(me.getSerializableObject(element, [], value.serializationSpec));
+            var callback =  async function (...args) {
+              
+                if (value.getArgumentsSerializationAndRef) {
+                    var passedArgs = args.map(arg => {
+                        return {
+                            Reference: me.storeObjectRef(arg),
+                            Data: me.getSerializableObject(arg, [], value.serializationSpec, value.includeDefaults)
+                        }
+                    });
+                    try {
+                        var result = await netObjectRef.invokeMethodAsync('Invoke', ...passedArgs);
+                        return result;
                     }
-                } else {
-                    for (let index = 0; index < arguments.length; index++) {
-                        const element = arguments[index];
-                        args.push(me.storeObjectRef(element));
+                    finally {
+                        passedArgs.forEach(arg => me.removeObjectRef(arg.Reference));
                     }
                 }
-                return netObjectRef.invokeMethodAsync('Invoke', ...args);
+                else {
+                    var passedArgs = [];
+                    if (!value.getJsObjectRef) {
+                        for (let index = 0; index < arguments.length; index++) {
+                            const element = arguments[index];
+                            passedArgs.push(me.getSerializableObject(element, [], value.serializationSpec, value.includeDefaults));
+                        }
+                    } else {
+                        for (let index = 0; index < arguments.length; index++) {
+                            const element = arguments[index];
+                            passedArgs.push(me.storeObjectRef(element));
+                        }
+                    }
+
+                    var result = await netObjectRef.invokeMethodAsync('Invoke', ...passedArgs);
+                    return result;
+
+                }
             };
+
+            if (value.debounce != undefined) {
+                return me.debounce(callback, value.debounce, value.immediate, value.triggerPermanent);
+            }
+            else {
+                return callback;
+            }
+
         } else {
             return value;
         }
@@ -138,6 +191,9 @@ browserInterop = new (function () {
         var res = me.getSerializableObject(data, [], serializationSpec);
         return res;
     };
+    this.callInstanceAction = function (instance, methodPath, ...args) {
+        this.callInstanceMethod(instance, methodPath, ...args);
+    }
     this.callInstanceMethod = function (instance, methodPath, ...args) {
         if (methodPath.indexOf('.') >= 0) {
             //if it's a method call on a child object we get this child object so the method call will happen in the context of the child object
@@ -159,7 +215,14 @@ browserInterop = new (function () {
     this.callInstanceMethodGetRef = function (instance, methodPath, ...args) {
         return this.storeObjectRef(this.callInstanceMethod(instance, methodPath, ...args));
     };
-    this.getSerializableObject = function (data, alreadySerialized, serializationSpec) {
+    this.callInstanceMethodGetRefs = function (instance, methodPath, ...args) {
+
+        var objects = this.callInstanceMethod(instance, methodPath, ...args);
+        var references = objects.map(arg => me.storeObjectRef(arg));
+        return references;
+    };
+
+    this.getSerializableObject = function (data, alreadySerialized, serializationSpec, includeDefaults) {
         if (serializationSpec === false) {
             return undefined;
         }
@@ -188,7 +251,7 @@ browserInterop = new (function () {
             var currentMemberSpec;
             if (serializationSpec != "*") {
                 currentMemberSpec = Array.isArray(data) ? serializationSpec : serializationSpec[i];
-                if (!currentMemberSpec) {
+                if ((!includeDefaults && !currentMemberSpec) || (currentMemberSpec === undefined)) {
                     continue;
                 }
             } else {
@@ -204,7 +267,7 @@ browserInterop = new (function () {
                     for (var j = 0; j < currentMember.length; j++) {
                         const arrayItem = currentMember[j];
                         if (typeof arrayItem === 'object') {
-                            res[i].push(me.getSerializableObject(arrayItem, alreadySerialized, currentMemberSpec));
+                            res[i].push(me.getSerializableObject(arrayItem, alreadySerialized, currentMemberSpec, includeDefaults));
                         } else {
                             res[i].push(arrayItem);
                         }
@@ -214,7 +277,7 @@ browserInterop = new (function () {
                     if (currentMember.length === 0) {
                         res[i] = [];
                     } else {
-                        res[i] = me.getSerializableObject(currentMember, alreadySerialized, currentMemberSpec);
+                        res[i] = me.getSerializableObject(currentMember, alreadySerialized, currentMemberSpec, includeDefaults);
                     }
                 }
 
