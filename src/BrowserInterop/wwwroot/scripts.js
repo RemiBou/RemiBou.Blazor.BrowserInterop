@@ -1,8 +1,8 @@
 
 browserInterop = new (function () {
-    var jsObjectRefs = {};
-    var jsObjectRefId = 0;
-    var me = this;
+    let jsObjectRefs = {};
+    let jsObjectRefId = 0;
+    let me = this;
 
     const jsRefKey = '__jsObjectRefId'; // Keep in sync with ElementRef.cs
 
@@ -13,7 +13,7 @@ browserInterop = new (function () {
             value.hasOwnProperty(jsRefKey) &&
             typeof value[jsRefKey] === 'number') {
 
-            var id = value[jsRefKey];
+            let id = value[jsRefKey];
             if (!(id in jsObjectRefs)) {
                 throw new Error("This JS object reference does not exists : " + id);
             }
@@ -34,10 +34,10 @@ browserInterop = new (function () {
             value.hasOwnProperty("__isCallBackWrapper")) {
 
 
-            var netObjectRef = value.callbackRef;
+            let netObjectRef = value.callbackRef;
 
             return function () {
-                var args = [];
+                let args = [];
                 if (!value.getJsObjectRef) {
                     for (let index = 0; index < arguments.length; index++) {
                         const element = arguments[index];
@@ -55,17 +55,17 @@ browserInterop = new (function () {
             return value;
         }
     });
-    var eventListenersIdCurrent = 0;
-    var eventListeners = {};
+    let eventListenersIdCurrent = 0;
+    let eventListeners = {};
     this.addEventListener = function (instance, propertyPath, eventName, callback) {
-        var target = me.getInstanceProperty(instance, propertyPath);
+        let target = me.getInstanceProperty(instance, propertyPath);
         target.addEventListener(eventName, callback);
-        var eventId = eventListenersIdCurrent++;
+        let eventId = eventListenersIdCurrent++;
         eventListeners[eventId] = callback;
         return eventId;
     };
     this.removeEventListener = function (instance, propertyPath, eventName, eventListenersId) {
-        var target = me.getInstanceProperty(instance, propertyPath);
+        let target = me.getInstanceProperty(instance, propertyPath);
         target.removeEventListener(eventName, eventListeners[eventListenersId]);
         delete eventListeners[eventListenersId];
     };
@@ -82,9 +82,9 @@ browserInterop = new (function () {
         return me.storeObjectRef(me.getInstanceProperty(instance, propertyPath));
     };
     this.storeObjectRef = function (obj) {
-        var id = jsObjectRefId++;
+        let id = jsObjectRefId++;
         jsObjectRefs[id] = obj;
-        var jsRef = {};
+        let jsRef = {};
         jsRef[jsRefKey] = id;
         return jsRef;
     }
@@ -92,7 +92,7 @@ browserInterop = new (function () {
         delete jsObjectRefs[id];
     }
     function getPropertyList(path) {
-        var res = path.replace('[', '.').replace(']', '').split('.');
+        let res = path.replace('[', '.').replace(']', '').split('.');
         if (res[0] === "") { // if we pass "[0].id" we want to return [0,'id']
             res.shift();
         }
@@ -102,8 +102,8 @@ browserInterop = new (function () {
         if (propertyPath === '') {
             return instance;
         }
-        var currentProperty = instance;
-        var splitProperty = getPropertyList(propertyPath);
+        let currentProperty = instance;
+        let splitProperty = getPropertyList(propertyPath);
 
         for (i = 0; i < splitProperty.length; i++) {
             if (splitProperty[i] in currentProperty) {
@@ -115,8 +115,8 @@ browserInterop = new (function () {
         return currentProperty;
     };
     this.setInstanceProperty = function (instance, propertyPath, value) {
-        var currentProperty = instance;
-        var splitProperty = getPropertyList(propertyPath);
+        let currentProperty = instance;
+        let splitProperty = getPropertyList(propertyPath);
         for (i = 0; i < splitProperty.length; i++) {
             if (splitProperty[i] in currentProperty) {
                 if (i === splitProperty.length - 1) {
@@ -131,18 +131,18 @@ browserInterop = new (function () {
         }
     };
     this.getInstancePropertySerializable = function (instance, propertyName, serializationSpec) {
-        var data = me.getInstanceProperty(instance, propertyName);
+        let data = me.getInstanceProperty(instance, propertyName);
         if (data instanceof Promise) {//needed when some properties like beforeinstallevent.userChoice are promise
             return data;
         }
-        var res = me.getSerializableObject(data, [], serializationSpec);
+        let res = me.getSerializableObject(data, [], serializationSpec);
         return res;
     };
     this.callInstanceMethod = function (instance, methodPath, ...args) {
         if (methodPath.indexOf('.') >= 0) {
             //if it's a method call on a child object we get this child object so the method call will happen in the context of the child object
             //some method like window.locaStorage.setItem  will throw an exception if the context is not expected
-            var instancePath = methodPath.substring(0, methodPath.lastIndexOf('.'));
+            let instancePath = methodPath.substring(0, methodPath.lastIndexOf('.'));
             instance = me.getInstanceProperty(instance, instancePath);
             methodPath = methodPath.substring(methodPath.lastIndexOf('.') + 1);
         }
@@ -153,7 +153,7 @@ browserInterop = new (function () {
                 args[index] = undefined;
             }
         }
-        var method = me.getInstanceProperty(instance, methodPath);
+        let method = me.getInstanceProperty(instance, methodPath);
         return method.apply(instance, args);
     };
     this.callInstanceMethodGetRef = function (instance, methodPath, ...args) {
@@ -175,17 +175,17 @@ browserInterop = new (function () {
             typeof data == "boolean") {
             return data;
         }
-        var res = (Array.isArray(data)) ? [] : {};
+        let res = (Array.isArray(data)) ? [] : {};
         if (!serializationSpec) {
             serializationSpec = "*";
         }
-        for (var i in data) {
-            var currentMember = data[i];
+        for (let i in data) {
+            let currentMember = data[i];
 
             if (typeof currentMember === 'function' || currentMember === null) {
                 continue;
             }
-            var currentMemberSpec;
+            let currentMemberSpec;
             if (serializationSpec != "*") {
                 currentMemberSpec = Array.isArray(data) ? serializationSpec : serializationSpec[i];
                 if (!currentMemberSpec) {
@@ -201,7 +201,7 @@ browserInterop = new (function () {
                 alreadySerialized.push(currentMember);
                 if (Array.isArray(currentMember) || currentMember.length) {
                     res[i] = [];
-                    for (var j = 0; j < currentMember.length; j++) {
+                    for (let j = 0; j < currentMember.length; j++) {
                         const arrayItem = currentMember[j];
                         if (typeof arrayItem === 'object') {
                             res[i].push(me.getSerializableObject(arrayItem, alreadySerialized, currentMemberSpec));
@@ -255,13 +255,13 @@ browserInterop = new (function () {
         this.getBattery = function () {
             return new Promise(function (resolve, reject) {
                 if (navigator.battery) {//some browser does not implement getBattery but battery instead see https://developer.mozilla.org/en-US/docs/Web/API/Navigator/battery
-                    var res = me.getSerializableObject(navigator.battery);
+                    let res = me.getSerializableObject(navigator.battery);
                     resolve(res);
                 }
                 else if ('getBattery' in navigator) {
                     navigator.getBattery().then(
                         function (battery) {
-                            var res = me.getSerializableObject(battery);
+                            let res = me.getSerializableObject(battery);
                             resolve(res);
                         }
                     );
