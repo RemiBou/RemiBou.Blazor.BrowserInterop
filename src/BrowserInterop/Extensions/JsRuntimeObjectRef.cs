@@ -14,9 +14,41 @@ namespace BrowserInterop.Extensions
 
         [JsonPropertyName("__jsObjectRefId")] public int JsObjectRefId { get; set; }
 
+        private ValueTask RemoveObjectRef()
+        {
+            const string identifier = "browserInterop.removeObjectRef";
+
+            switch (JsRuntime)
+            {
+                case IJSInProcessRuntime js:
+                    js.InvokeVoid(identifier, JsObjectRefId);
+                    return default;
+                default:
+                    return JsRuntime.InvokeVoidAsync(identifier, JsObjectRefId);
+            }
+        }
+#pragma warning disable 4014, CA2012, CA1031
+        ~JsRuntimeObjectRef()
+        {
+            Cleanup(); // Cannot wait inside a finalizer.
+
+            async ValueTask Cleanup()
+            {
+                try
+                {
+                    await RemoveObjectRef().ConfigureAwait(false);
+                }
+                catch
+                {
+                    // Catch any thrown exceptions during cleanup, as it won't go observed by the finalizer.
+                }
+            }
+        }
+#pragma warning restore
+
         public async ValueTask DisposeAsync()
         {
-            await JsRuntime.InvokeVoidAsync("browserInterop.removeObjectRef", JsObjectRefId).ConfigureAwait(false);
+            await RemoveObjectRef().ConfigureAwait(false);
             GC.SuppressFinalize(this);
         }
     }

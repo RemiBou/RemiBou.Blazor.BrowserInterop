@@ -353,3 +353,4 @@ MigrationBackup/
 test/BrowserInterop.E2ETests/cypress/videos/
 test/BrowserInterop.E2ETests/cypress/screenshots/
 .DS_Store
+.idea
