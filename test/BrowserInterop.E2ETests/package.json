@@ -18,6 +18,6 @@
     "cypress": "^6.2.1",
     "cypress-terminal-report": "^1.4.2",
     "start-server-and-test": "^1.11.6",
-    "wait-on": "^5.2.1"
+    "wait-on": "^6.0.0"
   }
 }
